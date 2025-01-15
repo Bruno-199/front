@@ -1,1 +1,221 @@
-<h1>probando front 123</h1>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biblioteca</title>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .book-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .book-actions {
+            margin-top: 10px;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+        }
+
+        .edit-btn {
+            background-color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gestión de Libros</h1>
+        
+        <!-- Formulario para añadir/editar libros -->
+        <form id="bookForm">
+            <input type="hidden" id="bookId">
+            <div class="form-group">
+                <label for="name">Título:</label>
+                <input type="text" id="name" required>
+            </div>
+            <div class="form-group">
+                <label for="author">Autor:</label>
+                <input type="text" id="author" required>
+            </div>
+            <div class="form-group">
+                <label for="year">Año:</label>
+                <input type="number" id="year" required>
+            </div>
+            <button type="submit" id="submitBtn">Añadir Libro</button>
+            <button type="button" id="cancelBtn" style="display: none;">Cancelar</button>
+        </form>
+
+        <!-- Lista de libros -->
+        <div class="books-container">
+            <h2>Libros Disponibles</h2>
+            <div id="booksList"></div>
+        </div>
+    </div>
+    <script>
+        const API_URL = 'https://api-h8wy.onrender.com';
+
+        // Estado de la aplicación
+        let editingBookId = null;
+
+        // Elementos del DOM
+        const bookForm = document.getElementById('bookForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const booksListDiv = document.getElementById('booksList');
+
+        // Funciones principales
+        async function loadBooks() {
+            try {
+                const response = await fetch(`${API_URL}/books`);
+                const books = await response.json();
+                displayBooks(books);
+            } catch (error) {
+                console.error('Error al cargar los libros:', error);
+            }
+        }
+
+        function displayBooks(books) {
+            booksListDiv.innerHTML = books.map(book => `
+                <div class="book-card">
+                    <h3>${book.name || book.title}</h3>
+                    <p>Autor: ${book.author}</p>
+                    <p>Año: ${book.year}</p>
+                    <div class="book-actions">
+                        <button onclick="editBook(${book.id})" class="edit-btn">Editar</button>
+                        <button onclick="deleteBook(${book.id})" class="delete-btn">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            const bookData = {
+                name: document.getElementById('name').value,
+                author: document.getElementById('author').value,
+                year: parseInt(document.getElementById('year').value)
+            };
+
+            try {
+                if (editingBookId) {
+                    await updateBook(editingBookId, bookData);
+                } else {
+                    await createBook(bookData);
+                }
+                
+                bookForm.reset();
+                resetFormState();
+                loadBooks();
+            } catch (error) {
+                console.error('Error al guardar el libro:', error);
+            }
+        }
+
+        async function createBook(bookData) {
+            await fetch(`${API_URL}/books`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bookData)
+            });
+        }
+
+        async function updateBook(id, bookData) {
+            await fetch(`${API_URL}/books/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bookData)
+            });
+        }
+
+        async function deleteBook(id) {
+            if (confirm('¿Estás seguro de que deseas eliminar este libro?')) {
+                try {
+                    await fetch(`${API_URL}/books/${id}`, {
+                        method: 'DELETE'
+                    });
+                    loadBooks();
+                } catch (error) {
+                    console.error('Error al eliminar el libro:', error);
+                }
+            }
+        }
+
+        async function editBook(id) {
+            try {
+                const response = await fetch(`${API_URL}/books/${id}`);
+                const book = await response.json();
+                
+                document.getElementById('name').value = book.name || book.title;
+                document.getElementById('author').value = book.author;
+                document.getElementById('year').value = book.year;
+                
+                editingBookId = id;
+                submitBtn.textContent = 'Actualizar Libro';
+                cancelBtn.style.display = 'inline';
+            } catch (error) {
+                console.error('Error al cargar el libro:', error);
+            }
+        }
+
+        function resetFormState() {
+            editingBookId = null;
+            submitBtn.textContent = 'Añadir Libro';
+            cancelBtn.style.display = 'none';
+        }
+
+        // Event Listeners
+        bookForm.addEventListener('submit', handleSubmit);
+        cancelBtn.addEventListener('click', () => {
+            bookForm.reset();
+            resetFormState();
+        });
+
+        // Cargar libros al iniciar
+        loadBooks();
+    </script>
+</body>
+</html>
