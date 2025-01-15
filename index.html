@@ -5,57 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Biblioteca</title>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
         .container {
             max-width: 800px;
-            margin: 0 auto;
+            margin: 20px auto;
             padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
-
         .form-group {
             margin-bottom: 15px;
         }
-
         .form-group label {
             display: block;
             margin-bottom: 5px;
+            font-weight: bold;
         }
-
         .form-group input {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
         }
-
         button {
-            padding: 8px 15px;
+            padding: 10px 20px;
             background-color: #007bff;
-            color: white;
+            color: #fff;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-right: 10px;
+            margin-right: 5px;
         }
-
         button:hover {
             background-color: #0056b3;
         }
-
         .book-card {
             border: 1px solid #ddd;
             padding: 15px;
             margin-bottom: 10px;
             border-radius: 4px;
+            display: flex;
+            align-items: center;
         }
-
+        .book-card img {
+            max-width: 80px;
+            margin-right: 15px;
+            border-radius: 4px;
+        }
         .book-actions {
             margin-top: 10px;
         }
-
         .delete-btn {
             background-color: #dc3545;
         }
-
         .edit-btn {
             background-color: #28a745;
         }
@@ -64,8 +72,6 @@
 <body>
     <div class="container">
         <h1>Gestión de Libros</h1>
-        
-        <!-- Formulario para añadir/editar libros -->
         <form id="bookForm">
             <input type="hidden" id="bookId">
             <div class="form-group">
@@ -80,48 +86,37 @@
                 <label for="year">Año:</label>
                 <input type="number" id="year" required>
             </div>
+            <div class="form-group">
+                <label for="image">URL de la Imagen:</label>
+                <input type="text" id="image" placeholder="https://example.com/image.jpg">
+            </div>
             <button type="submit" id="submitBtn">Añadir Libro</button>
             <button type="button" id="cancelBtn" style="display: none;">Cancelar</button>
         </form>
-
-        <!-- Lista de libros -->
-        <div class="books-container">
-            <h2>Libros Disponibles</h2>
-            <div id="booksList"></div>
-        </div>
+        <div id="booksList"></div>
     </div>
     <script>
         const API_URL = 'https://api-h8wy.onrender.com';
-
-        // Estado de la aplicación
-        let editingBookId = null;
-
-        // Elementos del DOM
         const bookForm = document.getElementById('bookForm');
+        const booksListDiv = document.getElementById('booksList');
         const submitBtn = document.getElementById('submitBtn');
         const cancelBtn = document.getElementById('cancelBtn');
-        const booksListDiv = document.getElementById('booksList');
+        let editingBookId = null;
 
-        // Funciones principales
         async function loadBooks() {
-            try {
-                const response = await fetch(`${API_URL}/books`);
-                const books = await response.json();
-                displayBooks(books);
-            } catch (error) {
-                console.error('Error al cargar los libros:', error);
-            }
-        }
-
-        function displayBooks(books) {
+            const res = await fetch(`${API_URL}/books`);
+            const books = await res.json();
             booksListDiv.innerHTML = books.map(book => `
                 <div class="book-card">
-                    <h3>${book.name || book.title}</h3>
-                    <p>Autor: ${book.author}</p>
-                    <p>Año: ${book.year}</p>
-                    <div class="book-actions">
-                        <button onclick="editBook(${book.id})" class="edit-btn">Editar</button>
-                        <button onclick="deleteBook(${book.id})" class="delete-btn">Eliminar</button>
+                    <img src="${book.image || 'https://via.placeholder.com/80'}" alt="${book.name || book.title}">
+                    <div>
+                        <h3>${book.name || book.title}</h3>
+                        <p>Autor: ${book.author}</p>
+                        <p>Año: ${book.year}</p>
+                        <div class="book-actions">
+                            <button onclick="editBook(${book.id})" class="edit-btn">Editar</button>
+                            <button onclick="deleteBook(${book.id})" class="delete-btn">Eliminar</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -129,92 +124,59 @@
 
         async function handleSubmit(event) {
             event.preventDefault();
-            
             const bookData = {
                 name: document.getElementById('name').value,
                 author: document.getElementById('author').value,
-                year: parseInt(document.getElementById('year').value)
+                year: parseInt(document.getElementById('year').value),
+                image: document.getElementById('image').value
             };
-
-            try {
-                if (editingBookId) {
-                    await updateBook(editingBookId, bookData);
-                } else {
-                    await createBook(bookData);
-                }
-                
-                bookForm.reset();
-                resetFormState();
-                loadBooks();
-            } catch (error) {
-                console.error('Error al guardar el libro:', error);
+            if (editingBookId) {
+                await fetch(`${API_URL}/books/${editingBookId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookData)
+                });
+                editingBookId = null;
+            } else {
+                await fetch(`${API_URL}/books`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookData)
+                });
             }
+            bookForm.reset();
+            cancelBtn.style.display = 'none';
+            submitBtn.textContent = 'Añadir Libro';
+            loadBooks();
         }
 
-        async function createBook(bookData) {
-            await fetch(`${API_URL}/books`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bookData)
-            });
-        }
-
-        async function updateBook(id, bookData) {
-            await fetch(`${API_URL}/books/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bookData)
-            });
+        async function editBook(id) {
+            const res = await fetch(`${API_URL}/books/${id}`);
+            const book = await res.json();
+            document.getElementById('name').value = book.name || book.title;
+            document.getElementById('author').value = book.author;
+            document.getElementById('year').value = book.year;
+            document.getElementById('image').value = book.image || '';
+            editingBookId = id;
+            cancelBtn.style.display = 'inline';
+            submitBtn.textContent = 'Actualizar Libro';
         }
 
         async function deleteBook(id) {
             if (confirm('¿Estás seguro de que deseas eliminar este libro?')) {
-                try {
-                    await fetch(`${API_URL}/books/${id}`, {
-                        method: 'DELETE'
-                    });
-                    loadBooks();
-                } catch (error) {
-                    console.error('Error al eliminar el libro:', error);
-                }
+                await fetch(`${API_URL}/books/${id}`, { method: 'DELETE' });
+                loadBooks();
             }
         }
 
-        async function editBook(id) {
-            try {
-                const response = await fetch(`${API_URL}/books/${id}`);
-                const book = await response.json();
-                
-                document.getElementById('name').value = book.name || book.title;
-                document.getElementById('author').value = book.author;
-                document.getElementById('year').value = book.year;
-                
-                editingBookId = id;
-                submitBtn.textContent = 'Actualizar Libro';
-                cancelBtn.style.display = 'inline';
-            } catch (error) {
-                console.error('Error al cargar el libro:', error);
-            }
-        }
-
-        function resetFormState() {
-            editingBookId = null;
-            submitBtn.textContent = 'Añadir Libro';
-            cancelBtn.style.display = 'none';
-        }
-
-        // Event Listeners
         bookForm.addEventListener('submit', handleSubmit);
         cancelBtn.addEventListener('click', () => {
             bookForm.reset();
-            resetFormState();
+            cancelBtn.style.display = 'none';
+            submitBtn.textContent = 'Añadir Libro';
+            editingBookId = null;
         });
 
-        // Cargar libros al iniciar
         loadBooks();
     </script>
 </body>
